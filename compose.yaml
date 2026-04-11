@@ -1,0 +1,42 @@
+services:
+  db:
+    image: postgres:15
+    container_name: soc_db
+    restart: always
+    environment:
+      POSTGRES_USER: itay_admin
+      POSTGRES_PASSWORD: password123
+      POSTGRES_DB: soc_data
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  backend:
+    build: ./backend
+    container_name: soc_backend
+    restart: always
+    ports:
+      - "8000:8000"
+    environment:
+      - DATABASE_URL=postgresql://itay_admin:password123@db:5432/soc_data
+    volumes:
+      - ./backend:/app
+    # מצב reload מאפשר שינוי קוד פייתון בלי לבנות מחדש
+    command: python -m uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - db
+
+  frontend:
+    build: ./frontend
+    container_name: soc_frontend
+    restart: always
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html
+    depends_on:
+      - backend
+
+volumes:
+  postgres_data:

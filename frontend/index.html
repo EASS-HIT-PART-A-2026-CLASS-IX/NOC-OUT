@@ -1,0 +1,1229 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>👊 NOC OUT</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/exceljs/4.3.0/exceljs.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/js-yaml@4.1.0/dist/js-yaml.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/marked@11.1.1/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sql-formatter@15.1.2/dist/sql-formatter.min.js"></script>
+    <script src="qtt-extras.js" defer></script>
+    <script src="app.js" defer></script>
+
+    <style>
+        :root {
+            --bg: #0c0e14;
+            --surface: #151922;
+            --border: rgba(255, 255, 255, 0.072);
+            --sidebar: #090b10;
+            --text-main: #eef1f7;
+            --text-dim: #8b93a7;
+            --accent: #4d8dee;
+            --accent-muted: rgba(77, 141, 238, 0.16);
+            --green: #3db88a;
+            --red: #e85d5d;
+            --yellow: #e5a84a;
+            --orange: #e8925c;
+            --radius-sm: 8px;
+            --radius-md: 11px;
+            --radius-lg: 15px;
+            --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 1px 2px rgba(0, 0, 0, 0.18), 0 16px 48px rgba(0, 0, 0, 0.28);
+            --shadow-float: 0 8px 30px rgba(0, 0, 0, 0.22);
+        }
+        [data-theme="light"] {
+            --bg: #eef0f4;
+            --surface: #ffffff;
+            --border: rgba(15, 23, 42, 0.09);
+            --sidebar: #ffffff;
+            --text-main: #12151c;
+            --text-dim: #5c6578;
+            --accent: #2563eb;
+            --accent-muted: rgba(37, 99, 235, 0.1);
+            --shadow-card: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 1px 2px rgba(15, 23, 42, 0.04), 0 14px 40px rgba(15, 23, 42, 0.07);
+            --shadow-float: 0 8px 28px rgba(15, 23, 42, 0.08);
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; transition: background-color 0.22s ease, color 0.18s ease, border-color 0.2s ease, box-shadow 0.22s ease; }
+        body {
+            font-family: 'Inter', system-ui, -apple-system, sans-serif;
+            background: var(--bg);
+            color: var(--text-main);
+            display: flex;
+            height: 100vh;
+            overflow: hidden;
+            -webkit-font-smoothing: antialiased;
+            -moz-osx-font-smoothing: grayscale;
+            letter-spacing: 0.01em;
+        }
+        body[data-theme="dark"] {
+            background-image: radial-gradient(ellipse 100% 55% at 50% -15%, rgba(77, 141, 238, 0.055), transparent 52%);
+        }
+        body[data-theme="light"] {
+            background-image: radial-gradient(ellipse 100% 50% at 50% -18%, rgba(37, 99, 235, 0.035), transparent 50%);
+        }
+
+        .sidebar {
+            width: 262px;
+            background: var(--sidebar);
+            border-right: 1px solid var(--border);
+            display: flex;
+            flex-direction: column;
+            padding: 26px 18px;
+            flex-shrink: 0;
+            z-index: 100;
+            box-shadow: 4px 0 32px rgba(0, 0, 0, 0.12);
+        }
+        [data-theme="light"] .sidebar {
+            box-shadow: 4px 0 24px rgba(15, 23, 42, 0.04);
+        }
+        .logo {
+            font-weight: 800;
+            letter-spacing: 0.12em;
+            color: var(--text-main);
+            margin-bottom: 36px;
+            font-size: 1.05rem;
+            line-height: 1.35;
+            padding-bottom: 18px;
+            border-bottom: 1px solid var(--border);
+        }
+        .nav-item {
+            padding: 11px 14px;
+            border-radius: var(--radius-md);
+            color: var(--text-dim);
+            text-decoration: none;
+            margin-bottom: 5px;
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            gap: 11px;
+            transition: background-color 0.18s ease, color 0.18s ease, box-shadow 0.2s ease;
+            font-weight: 500;
+            font-size: 0.84rem;
+        }
+        .nav-item:hover {
+            background: var(--accent-muted);
+            color: var(--text-main);
+        }
+        .nav-item.active {
+            background: var(--accent-muted);
+            color: var(--accent);
+            box-shadow: 0 0 0 1px rgba(77, 141, 238, 0.22);
+        }
+        [data-theme="light"] .nav-item.active {
+            box-shadow: 0 0 0 1px rgba(37, 99, 235, 0.2);
+        }
+
+        .main-content { flex-grow: 1; overflow-y: auto; padding: 28px 32px 40px; display: flex; flex-direction: column; gap: 22px; }
+        .page { display: none; flex-direction: column; gap: 22px; animation: fadeIn 0.45s ease; }
+        .page.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(8px); } to { opacity: 1; transform: translateY(0); } }
+
+        .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 22px; }
+        .card {
+            background: var(--surface);
+            border-radius: var(--radius-lg);
+            padding: 22px 24px;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow-card);
+            position: relative;
+        }
+        .card-header {
+            font-weight: 600;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+            text-transform: uppercase;
+            letter-spacing: 0.1em;
+            border-bottom: 1px solid var(--border);
+            padding-bottom: 12px;
+            margin-bottom: 18px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+
+        input, select, textarea {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            padding: 9px 14px;
+            border-radius: var(--radius-sm);
+            width: 100%;
+            margin-bottom: 10px;
+            font-family: inherit;
+            font-size: 0.86rem;
+        }
+        input:focus, select:focus, textarea:focus {
+            outline: none;
+            border-color: rgba(77, 141, 238, 0.45);
+            box-shadow: 0 0 0 3px var(--accent-muted);
+        }
+        [data-theme="light"] input:focus,
+        [data-theme="light"] select:focus,
+        [data-theme="light"] textarea:focus {
+            border-color: rgba(37, 99, 235, 0.45);
+        }
+        .btn {
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            padding: 9px 17px;
+            border-radius: var(--radius-sm);
+            font-weight: 600;
+            cursor: pointer;
+            transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.15s ease;
+            font-size: 0.8rem;
+            box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
+        }
+        .btn:hover {
+            filter: brightness(1.05);
+            transform: translateY(-1px);
+            box-shadow: 0 4px 14px rgba(77, 141, 238, 0.28);
+        }
+        [data-theme="light"] .btn:hover {
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.2);
+        }
+        .btn-save { background: var(--green); }
+        .btn-save:hover { box-shadow: 0 4px 14px rgba(52, 184, 138, 0.25); }
+        
+        /* Action buttons for incidents */
+        .btn-icon { background: var(--bg); border: 1px solid var(--border); color: var(--text-main); padding: 4px 8px; border-radius: 4px; cursor: pointer; font-size: 0.7rem; }
+        .btn-icon:hover { background: var(--border); }
+        .btn-resolve { background: rgba(16, 185, 129, 0.2); color: var(--green); border-color: var(--green); }
+        .btn-resolve:hover { background: var(--green); color: #fff; }
+
+        .clock-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(110px, 1fr)); gap: 10px; }
+        .clock-item { background: rgba(0,0,0,0.2); padding: 10px; border-radius: 8px; text-align: center; border: 1px solid var(--border); }
+        
+        /* Critical Banner Animation */
+        @keyframes pulseAlert { 0% { box-shadow: 0 0 0 0 rgba(232, 93, 93, 0.35); } 70% { box-shadow: 0 0 0 12px rgba(232, 93, 93, 0); } 100% { box-shadow: 0 0 0 0 rgba(232, 93, 93, 0); } }
+        .critical-banner { background: linear-gradient(135deg, #c94a4a, var(--red)); color: white; padding: 15px 20px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 10px; animation: pulseAlert 2.5s ease-in-out infinite; box-shadow: var(--shadow-float); }
+        
+        table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
+        th { text-align: left; color: var(--text-dim); padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+        td { padding: 8px 0; border-bottom: 1px solid rgba(255,255,255,0.05); }
+
+        /* NOC Tools */
+        .noc-toast { position: fixed; bottom: 24px; right: 24px; background: var(--surface); border: 1px solid var(--border); color: var(--text-main); padding: 12px 18px; border-radius: var(--radius-md); font-size: 0.8rem; font-weight: 500; z-index: 1000; opacity: 0; pointer-events: none; transition: opacity 0.25s ease; box-shadow: 0 8px 32px rgba(0,0,0,0.28), 0 0 0 1px rgba(77, 141, 238, 0.1); }
+        .noc-toast.visible { opacity: 1; }
+        .noc-cat { margin-bottom: 18px; }
+        .noc-cat-title { font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 10px; }
+        .noc-template { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; padding: 12px 0; border-bottom: 1px solid var(--border); }
+        .noc-template:last-child { border-bottom: none; }
+        .noc-template-body { font-size: 0.8rem; color: var(--text-main); line-height: 1.45; flex: 1; }
+        .noc-template-title { font-weight: 700; font-size: 0.75rem; color: var(--accent); margin-bottom: 4px; }
+        .btn-copy { flex-shrink: 0; }
+        .log-formatted-pre { margin-top: 12px; min-height: 120px; max-height: 420px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; padding: 8px 10px; font-family: 'JetBrains Mono', monospace; font-size: 0.74rem; line-height: 1.55; word-break: break-word; transition: none; }
+        .log-formatted-pre, .log-formatted-pre * { transition: none !important; }
+        .log-viewport { display: flex; flex-direction: column; gap: 0; }
+        .log-line { border-left: 3px solid var(--border); padding: 3px 6px 3px 10px; margin: 1px 0; color: var(--text-main); }
+        .log-line:hover { background: rgba(255,255,255,0.04); }
+        .log-line-hot { border-left-color: var(--red); background: rgba(239, 68, 68, 0.06); }
+        .log-line-warn { border-left-color: var(--yellow); background: rgba(245, 158, 11, 0.06); }
+        .log-time { color: #818cf8; font-weight: 600; }
+        [data-theme="light"] .log-time { color: #4f46e5; }
+        .log-acct { color: #2dd4bf; font-weight: 600; }
+        [data-theme="light"] .log-acct { color: #0d9488; }
+        .log-acct-line { color: #5eead4; font-weight: 600; }
+        .log-sev-crit { color: #fecaca !important; background: rgba(185, 28, 28, 0.45); font-weight: 800; padding: 0 3px; border-radius: 3px; text-transform: uppercase; box-shadow: 0 0 0 1px rgba(254,202,202,0.35); }
+        .log-sev-warn { color: #fef08a !important; background: rgba(161, 98, 7, 0.35); font-weight: 700; padding: 0 2px; border-radius: 3px; }
+        .log-sev-ok { color: #bbf7d0 !important; font-weight: 700; }
+        .log-sev-dbg { color: #93c5fd !important; font-weight: 600; }
+        .diff-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; margin-bottom: 12px; }
+        @media (max-width: 900px) { .diff-grid { grid-template-columns: 1fr; } }
+        .diff-grid label { display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
+        .diff-grid textarea { min-height: 160px; margin-bottom: 0; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; }
+        .diff-output { margin-top: 14px; max-height: 400px; overflow: auto; background: var(--bg); border: 1px solid var(--border); border-radius: 8px; font-family: 'JetBrains Mono', monospace; font-size: 0.72rem; line-height: 1.45; }
+        .diff-line { padding: 4px 10px 4px 28px; position: relative; white-space: pre-wrap; word-break: break-word; }
+        .diff-line::before { position: absolute; left: 8px; top: 4px; font-weight: 800; opacity: 0.85; }
+        .diff-line-del { background: rgba(239, 68, 68, 0.12); border-left: 3px solid var(--red); }
+        .diff-line-del::before { content: '−'; color: var(--red); }
+        .diff-line-add { background: rgba(16, 185, 129, 0.12); border-left: 3px solid var(--green); }
+        .diff-line-add::before { content: '+'; color: var(--green); }
+        .diff-line-same { color: var(--text-dim); border-left: 3px solid transparent; }
+        .diff-line-same::before { content: ' '; }
+        .diff-legend { display: flex; gap: 16px; font-size: 0.7rem; color: var(--text-dim); margin-top: 8px; flex-wrap: wrap; }
+        .diff-legend span { display: inline-flex; align-items: center; gap: 6px; }
+        .diff-legend i { width: 10px; height: 10px; border-radius: 2px; display: inline-block; }
+        .sample-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-bottom: 12px; }
+        .sample-row > span { font-size: 0.72rem; color: var(--text-dim); font-weight: 600; }
+
+        /* QA Lab */
+        .qa-bug-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 960px) { .qa-bug-grid { grid-template-columns: 1fr; } }
+        .qa-bug-grid label { display: block; font-size: 0.7rem; font-weight: 700; color: var(--text-dim); margin-bottom: 6px; text-transform: uppercase; }
+        .qa-bug-grid textarea { min-height: 90px; margin-bottom: 0; }
+        .qa-md-out { min-height: 220px; font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; line-height: 1.45; margin-top: 12px; }
+        .qa-kv { display: grid; grid-template-columns: 140px 1fr; gap: 6px 12px; font-size: 0.78rem; margin: 6px 0; }
+        .qa-kv dt { color: var(--text-dim); font-weight: 600; }
+        .qa-kv dd { margin: 0; word-break: break-word; }
+        .qa-device-card { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 12px; }
+        .qa-device-card h4 { font-size: 0.85rem; color: var(--accent); margin-bottom: 10px; }
+        .qa-advanced-block { background: var(--bg); border: 1px solid var(--border); border-radius: 10px; padding: 14px; margin-top: 12px; font-size: 0.78rem; }
+        .qa-advanced-block h4 { font-size: 0.72rem; text-transform: uppercase; color: var(--text-dim); margin-bottom: 10px; letter-spacing: 0.04em; }
+
+        /* IT Quick Tools */
+        .qtt-wrap { display: flex; flex-direction: column; gap: 16px; }
+        .qtt-search { margin-bottom: 0 !important; font-size: 0.9rem; padding: 10px 12px; }
+        .qtt-section { margin-bottom: 8px; }
+        .qtt-cat { font-size: 0.7rem; font-weight: 800; color: var(--text-dim); text-transform: uppercase; letter-spacing: 0.08em; margin: 14px 0 10px; }
+        .qtt-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 12px; }
+        .qtt-card { display: flex; align-items: flex-start; gap: 12px; padding: 14px 16px; background: var(--bg); border: 1px solid var(--border); border-radius: 10px; cursor: pointer; text-align: left; transition: border-color 0.15s, background 0.15s; }
+        .qtt-card:hover { border-color: rgba(77, 141, 238, 0.45); background: var(--accent-muted); }
+        .qtt-ic { font-size: 1.35rem; line-height: 1; flex-shrink: 0; }
+        .qtt-name { font-weight: 700; font-size: 0.85rem; color: var(--text-main); margin-bottom: 4px; }
+        .qtt-desc { font-size: 0.72rem; color: var(--text-dim); line-height: 1.35; }
+        .qtt-panel { display: none; }
+        .qtt-panel.active { display: block; }
+        .qtt-panel .card-header { align-items: center; gap: 12px; }
+        .qtt-panel-h { flex: 1; }
+        .qtt-hint { font-size: 0.72rem; color: var(--text-dim); margin-bottom: 10px; line-height: 1.45; }
+        .qtt-row { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; align-items: center; }
+        .qtt-meter { height: 8px; border-radius: 4px; background: var(--border); overflow: hidden; margin: 10px 0; }
+        .qtt-meter > div { height: 100%; border-radius: 4px; transition: width 0.2s; }
+        .qtt-pw-list { font-size: 0.75rem; color: var(--text-dim); margin-top: 8px; padding-left: 18px; }
+        .qtt-out { font-family: 'JetBrains Mono', monospace; font-size: 0.75rem; min-height: 80px; }
+
+        /* Support — Bookmark dashboard */
+        .dash-intro { font-size: 0.8rem; color: var(--text-dim); margin: 0 0 18px; line-height: 1.5; max-width: 720px; }
+        .dash-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+            gap: 16px;
+        }
+        @media (min-width: 900px) {
+            .dash-grid { grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 18px; }
+        }
+        .dash-tile {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 14px;
+            padding: 22px 16px;
+            min-height: 140px;
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 14px;
+            text-decoration: none;
+            color: var(--text-main);
+            transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, background 0.2s ease;
+            box-shadow: 0 2px 10px rgba(0, 0, 0, 0.14);
+        }
+        .dash-tile:hover {
+            transform: translateY(-4px);
+            border-color: rgba(77, 141, 238, 0.4);
+            box-shadow: 0 14px 36px rgba(0, 0, 0, 0.2);
+            background: var(--accent-muted);
+        }
+        .dash-tile:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 3px;
+        }
+        .dash-tile-icon-wrap {
+            width: 56px;
+            height: 56px;
+            border-radius: 12px;
+            background: #fff;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            flex-shrink: 0;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+        }
+        [data-theme="light"] .dash-tile-icon-wrap {
+            background: #f8fafc;
+            border: 1px solid var(--border);
+        }
+        .dash-tile-icon {
+            width: 36px;
+            height: 36px;
+            object-fit: contain;
+        }
+        .dash-tile-name {
+            font-weight: 800;
+            font-size: 0.9rem;
+            text-align: center;
+            letter-spacing: 0.02em;
+            line-height: 1.25;
+        }
+
+        /* Local scratchpad — floating, expandable */
+        .scratchpad {
+            position: fixed;
+            right: max(16px, env(safe-area-inset-right));
+            bottom: max(16px, env(safe-area-inset-bottom));
+            z-index: 999;
+            width: min(300px, calc(100vw - 28px));
+            max-height: 34vh;
+            display: flex;
+            flex-direction: column;
+            background: var(--surface);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-md);
+            box-shadow: var(--shadow-float);
+            overflow: hidden;
+            transition: width 0.22s ease, height 0.22s ease, max-height 0.22s ease, box-shadow 0.2s ease;
+        }
+        .scratchpad.scratchpad--expanded {
+            width: min(560px, calc(100vw - 24px));
+            height: min(440px, 58vh);
+            max-height: 58vh;
+            box-shadow: 0 20px 56px rgba(0, 0, 0, 0.32);
+        }
+        .scratchpad-head {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.15);
+            border-bottom: 1px solid var(--border);
+            flex-shrink: 0;
+        }
+        [data-theme="light"] .scratchpad-head {
+            background: rgba(0, 0, 0, 0.04);
+        }
+        .scratchpad-title {
+            font-size: 0.72rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--accent);
+        }
+        .scratchpad-actions {
+            display: flex;
+            gap: 4px;
+        }
+        .scratchpad-btn {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            width: 30px;
+            height: 28px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-size: 0.85rem;
+            line-height: 1;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: border-color 0.15s, background 0.15s;
+        }
+        .scratchpad-btn:hover {
+            border-color: var(--accent);
+            background: rgba(96, 165, 250, 0.12);
+        }
+        .scratchpad-hint {
+            font-size: 0.65rem;
+            color: var(--text-dim);
+            padding: 6px 10px 0;
+            margin: 0;
+            line-height: 1.35;
+        }
+        .scratchpad textarea {
+            flex: 1;
+            min-height: 88px;
+            margin: 8px 10px 10px;
+            width: calc(100% - 20px);
+            resize: none;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.78rem;
+            line-height: 1.45;
+            border-radius: 8px;
+        }
+        .scratchpad.scratchpad--expanded textarea {
+            min-height: 0;
+            resize: vertical;
+        }
+        .scratchpad-fab {
+            position: fixed;
+            right: max(18px, env(safe-area-inset-right));
+            bottom: max(18px, env(safe-area-inset-bottom));
+            z-index: 998;
+            width: 48px;
+            height: 48px;
+            border-radius: 50%;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            color: var(--text-main);
+            font-size: 1.25rem;
+            cursor: pointer;
+            display: none;
+            align-items: center;
+            justify-content: center;
+            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+            transition: transform 0.2s ease, border-color 0.15s;
+        }
+        .scratchpad-fab:hover {
+            transform: scale(1.06);
+            border-color: var(--accent);
+        }
+
+        /* Linux commands library */
+        .snip-intro { font-size: 0.8rem; color: var(--text-dim); margin: 0 0 16px; line-height: 1.5; max-width: 720px; }
+        .snip-cat {
+            background: var(--bg);
+            border: 1px solid var(--border);
+            border-radius: 10px;
+            margin-bottom: 12px;
+            overflow: hidden;
+        }
+        .snip-cat > summary {
+            list-style: none;
+            cursor: pointer;
+            padding: 12px 14px;
+            font-weight: 800;
+            font-size: 0.78rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            color: var(--accent);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            user-select: none;
+        }
+        .snip-cat > summary::-webkit-details-marker { display: none; }
+        .snip-cat > summary::after {
+            content: '▸';
+            font-size: 0.7rem;
+            color: var(--text-dim);
+            transition: transform 0.2s ease;
+        }
+        .snip-cat[open] > summary::after { transform: rotate(90deg); }
+        .snip-cat > summary:hover { background: rgba(96, 165, 250, 0.06); }
+        .snip-list { padding: 0 10px 10px; display: flex; flex-direction: column; gap: 10px; }
+        .snip-row {
+            display: grid;
+            grid-template-columns: 1fr auto;
+            gap: 10px 12px;
+            align-items: start;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+        }
+        @media (max-width: 640px) {
+            .snip-row { grid-template-columns: 1fr; }
+        }
+        .snip-row-main { min-width: 0; }
+        .snip-desc { font-size: 0.82rem; color: var(--text-main); margin: 0 0 8px; line-height: 1.45; }
+        .snip-code {
+            display: block;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.76rem;
+            line-height: 1.5;
+            padding: 8px 10px;
+            background: rgba(0, 0, 0, 0.25);
+            border-radius: 6px;
+            border: 1px solid var(--border);
+            color: var(--text-main);
+            word-break: break-all;
+            white-space: pre-wrap;
+        }
+        [data-theme="light"] .snip-code { background: #f1f5f9; }
+        .snip-row--danger {
+            border-color: rgba(239, 68, 68, 0.45);
+            background: rgba(239, 68, 68, 0.06);
+        }
+        .snip-row--danger .snip-code {
+            border-color: rgba(239, 68, 68, 0.55);
+            color: var(--red);
+            background: rgba(239, 68, 68, 0.1);
+        }
+        .snip-warn-badge {
+            display: inline-block;
+            margin-left: 8px;
+            font-size: 0.62rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+            color: var(--red);
+            vertical-align: middle;
+        }
+        .snip-copy-btn {
+            flex-shrink: 0;
+            align-self: center;
+            width: 42px;
+            height: 42px;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+            background: var(--bg);
+            color: var(--text-main);
+            cursor: pointer;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1rem;
+            transition: border-color 0.15s, background 0.15s, transform 0.15s;
+        }
+        .snip-copy-btn:hover {
+            border-color: var(--accent);
+            background: rgba(96, 165, 250, 0.12);
+            transform: scale(1.04);
+        }
+        .snip-copy-btn:focus-visible {
+            outline: 2px solid var(--accent);
+            outline-offset: 2px;
+        }
+        .snip-copy-btn.snip-copy-btn--done {
+            border-color: var(--green);
+            background: rgba(16, 185, 129, 0.2);
+            color: var(--green);
+        }
+        .snip-copy-btn:disabled { cursor: default; transform: none; }
+
+        /* Library — IT guides bookshelf */
+        .lib-shell { max-width: 1180px; margin: 0 auto; }
+        .lib-header-sticky {
+            position: sticky;
+            top: 0;
+            z-index: 25;
+            margin: -8px -8px 20px;
+            padding: 16px 16px 18px;
+            background: linear-gradient(180deg, var(--bg) 72%, rgba(15, 23, 42, 0));
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+            border-bottom: 1px solid var(--border);
+            border-radius: 0 0 14px 14px;
+        }
+        [data-theme="light"] .lib-header-sticky {
+            background: linear-gradient(180deg, var(--bg) 72%, rgba(243, 244, 246, 0));
+        }
+        .lib-header-row {
+            display: flex;
+            flex-wrap: wrap;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 14px 20px;
+        }
+        .lib-h2 {
+            margin: 0;
+            font-size: 1.35rem;
+            font-weight: 900;
+            letter-spacing: -0.02em;
+            color: var(--text-main);
+        }
+        .lib-tagline {
+            margin: 6px 0 0;
+            font-size: 0.78rem;
+            color: var(--text-dim);
+            max-width: 420px;
+            line-height: 1.45;
+        }
+        .lib-search {
+            min-width: min(320px, 100%);
+            max-width: 400px;
+            margin-bottom: 0 !important;
+            font-size: 0.9rem;
+            padding: 10px 14px;
+            border-radius: 10px;
+            border: 1px solid var(--border);
+            background: var(--surface);
+        }
+        .lib-search:focus {
+            outline: none;
+            border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(96, 165, 250, 0.2);
+        }
+        .lib-grid {
+            display: grid;
+            grid-template-columns: repeat(4, minmax(0, 1fr));
+            gap: 12px 14px;
+            padding-bottom: 28px;
+        }
+        @media (max-width: 1020px) {
+            .lib-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+        }
+        @media (max-width: 480px) {
+            .lib-grid { grid-template-columns: 1fr; }
+        }
+        .lib-book {
+            --lib-h: 210;
+            position: relative;
+            border-radius: 11px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            background: var(--surface);
+            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.2);
+            transition: transform 0.28s cubic-bezier(0.34, 1.2, 0.64, 1), box-shadow 0.28s ease;
+            min-height: 0;
+            display: flex;
+            flex-direction: column;
+        }
+        .lib-book::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background:
+                linear-gradient(155deg, hsla(var(--lib-h), 55%, 48%, 0.42) 0%, transparent 52%),
+                linear-gradient(-25deg, transparent 40%, hsla(calc(var(--lib-h) + 40), 50%, 40%, 0.15) 100%),
+                repeating-linear-gradient(0deg, transparent, transparent 11px, rgba(255, 255, 255, 0.025) 11px, rgba(255, 255, 255, 0.025) 12px);
+            pointer-events: none;
+        }
+        [data-theme="light"] .lib-book::before {
+            background:
+                linear-gradient(155deg, hsla(var(--lib-h), 65%, 45%, 0.2) 0%, transparent 55%),
+                repeating-linear-gradient(0deg, transparent, transparent 11px, rgba(0, 0, 0, 0.03) 11px, rgba(0, 0, 0, 0.03) 12px);
+        }
+        .lib-book::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 4px;
+            background: linear-gradient(180deg, hsl(var(--lib-h), 60%, 52%), hsl(calc(var(--lib-h) + 22), 55%, 38%));
+            border-radius: 11px 0 0 11px;
+            pointer-events: none;
+        }
+        .lib-book:hover {
+            transform: translateY(-5px) scale(1.015);
+            box-shadow: 0 16px 40px rgba(0, 0, 0, 0.28), 0 0 0 1px rgba(77, 141, 238, 0.14);
+        }
+        .lib-book-inner {
+            position: relative;
+            z-index: 1;
+            padding: 10px 10px 10px 14px;
+            display: flex;
+            flex-direction: column;
+            flex: 1;
+            min-height: 158px;
+        }
+        .lib-watermark {
+            position: absolute;
+            right: 2px;
+            top: 0;
+            font-size: 2.85rem;
+            font-weight: 900;
+            line-height: 1;
+            color: rgba(255, 255, 255, 0.06);
+            pointer-events: none;
+            user-select: none;
+        }
+        [data-theme="light"] .lib-watermark {
+            color: rgba(0, 0, 0, 0.06);
+        }
+        .lib-top {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 6px;
+            margin-bottom: 4px;
+        }
+        .lib-letter {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 26px;
+            height: 26px;
+            border-radius: 7px;
+            font-weight: 900;
+            font-size: 0.72rem;
+            background: rgba(0, 0, 0, 0.35);
+            color: #fff;
+            border: 1px solid rgba(255, 255, 255, 0.12);
+        }
+        [data-theme="light"] .lib-letter {
+            background: rgba(255, 255, 255, 0.85);
+            color: var(--text-main);
+            border-color: var(--border);
+        }
+        .lib-icon {
+            font-size: 1.15rem;
+            line-height: 1;
+            filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.35));
+        }
+        .lib-book-title {
+            margin: 0 0 auto;
+            padding: 4px 0 8px;
+            font-size: 0.72rem;
+            font-weight: 800;
+            line-height: 1.32;
+            color: var(--text-main);
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.25);
+            display: -webkit-box;
+            -webkit-line-clamp: 4;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+        [data-theme="light"] .lib-book-title {
+            text-shadow: none;
+        }
+        .lib-book-footer {
+            margin-top: auto;
+            padding-top: 4px;
+        }
+        .lib-read {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            width: 100%;
+            padding: 6px 8px;
+            border-radius: 7px;
+            font-weight: 800;
+            font-size: 0.58rem;
+            text-transform: uppercase;
+            letter-spacing: 0.06em;
+            text-decoration: none;
+            color: #fff;
+            background: linear-gradient(135deg, var(--accent), #2563eb);
+            border: none;
+            box-shadow: 0 2px 10px rgba(96, 165, 250, 0.3);
+            transition: opacity 0.15s, transform 0.15s;
+        }
+        .lib-read:hover {
+            opacity: 0.95;
+            transform: translateY(-1px);
+        }
+        .lib-empty {
+            display: none;
+            text-align: center;
+            padding: 48px 20px;
+            color: var(--text-dim);
+            font-size: 0.9rem;
+        }
+        .lib-empty.lib-empty--visible { display: block; }
+    </style>
+</head>
+<body data-theme="dark">
+
+    <div class="sidebar">
+        <div class="logo">👊 NOC OUT</div>
+        <div class="nav-item active" onclick="showPage('overview', this)">🏠 Overview</div>
+        <div class="nav-item" onclick="showPage('dashboard', this)">📊 DASHBOARD</div>
+        <div class="nav-item" onclick="showPage('noc-tools', this)">🔧 NOC Tools</div>
+        <div class="nav-item" onclick="showPage('qa-lab', this)">🧪 QA Lab</div>
+        <div class="nav-item" onclick="showPage('it-quick-tools', this)">⚡ IT Quick Tools</div>
+        <div class="nav-item" onclick="showPage('linux-commands', this)">🐧 LINUX COMMANDS</div>
+        <div class="nav-item" onclick="showPage('library', this)">📚 LIBRARY</div>
+        <div style="margin-top: auto; border-top: 1px solid var(--border); padding-top: 20px;">
+            <button class="btn" style="width:100%; background:var(--surface);" onclick="toggleTheme()">🌓 Toggle Day/Night</button>
+        </div>
+    </div>
+
+    <div class="main-content">
+        
+        <div id="overview" class="page active">
+            
+            <div id="critical-banner-container"></div>
+            
+            <div class="grid-3">
+                <div class="card" id="card-manager">
+                    <div class="card-header">👤 Shift Manager <button class="btn" style="padding:2px 8px;" onclick="editRoster('manager')">Edit</button></div>
+                    <div class="roster-view"><p id="view-manager-name" style="font-weight:700;">Not Set</p><p id="view-manager-slack" style="font-size:0.75rem; color:var(--text-dim);">---</p></div>
+                    <div class="roster-edit" style="display:none;"><input type="text" id="input-manager-name" placeholder="Name"><input type="text" id="input-manager-slack" placeholder="Slack URL"><button class="btn btn-save" onclick="saveRoster('manager')">Save</button></div>
+                </div>
+                <div class="card" id="card-soc">
+                    <div class="card-header">🛡️ SOC On-Call <button class="btn" style="padding:2px 8px;" onclick="editRoster('soc')">Edit</button></div>
+                    <div class="roster-view"><p id="view-soc-name" style="font-weight:700;">Not Set</p><p id="view-soc-phone" style="font-size:0.75rem; color:var(--text-dim);">---</p></div>
+                    <div class="roster-edit" style="display:none;"><input type="text" id="input-soc-name" placeholder="Name"><input type="text" id="input-soc-phone" placeholder="Phone"><button class="btn btn-save" onclick="saveRoster('soc')">Save</button></div>
+                </div>
+                <div class="card" id="card-tier2">
+                    <div class="card-header">🚀 Tier 2 On-Call <button class="btn" style="padding:2px 8px;" onclick="editRoster('tier2')">Edit</button></div>
+                    <div class="roster-view"><p id="view-tier2-name" style="font-weight:700;">Not Set</p><p id="view-tier2-phone" style="font-size:0.75rem; color:var(--text-dim);">---</p></div>
+                    <div class="roster-edit" style="display:none;"><input type="text" id="input-tier2-name" placeholder="Name"><input type="text" id="input-tier2-phone" placeholder="Phone"><button class="btn btn-save" onclick="saveRoster('tier2')">Save</button></div>
+                </div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">🌍 Global Operations Time</div>
+                <div class="clock-grid" id="world-clocks"></div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 1.5fr 1fr; gap:20px;">
+                <div class="card">
+                    <div class="card-header">🔴 Live Incident Tracker</div>
+                    <div style="display:grid; grid-template-columns: 1fr 1fr 120px; gap:10px;">
+                        <input type="text" id="inc-analyst" placeholder="Analyst Name">
+                        <select id="inc-client"></select>
+                        <select id="inc-sev">
+                            <option value="5">🔴 Sev 5</option>
+                            <option value="4">🟠 Sev 4</option>
+                            <option value="3" selected>🟡 Sev 3</option>
+                            <option value="2">🔵 Sev 2</option>
+                            <option value="1">🟢 Sev 1</option>
+                        </select>
+                    </div>
+                    <textarea id="inc-desc" placeholder="Problem description and indicators..."></textarea>
+                    <button class="btn" style="width:100%; padding:12px;" onclick="createIncident()">CREATE TICKET</button>
+                    <div id="incident-list" style="margin-top:15px; max-height: 250px; overflow-y: auto;"></div>
+                </div>
+                
+                <div style="display:flex; flex-direction:column; gap:20px;">
+                    <div class="card" style="flex-grow:1;">
+                        <div class="card-header">📊 Shift Performance (Resolved) <button class="btn" style="padding:2px 8px; font-size:0.6rem;" onclick="exportToExcel()">Export Excel</button></div>
+                        <div style="height:150px;"><canvas id="shiftChart"></canvas></div>
+                    </div>
+                    
+                    <div class="card" style="flex-grow:1;">
+                        <div class="card-header">📋 Incident Logs (Closed)</div>
+                        <div id="closed-incident-list" style="max-height: 120px; overflow-y: auto; font-size:0.75rem;">
+                            <p style="color:var(--text-dim); text-align:center; padding:10px;">No resolved incidents yet.</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="dashboard" class="page">
+            <div class="card">
+                <div class="card-header">📊 DASHBOARD — Support bookmarks</div>
+                <p class="dash-intro">Quick links to core tools for the Support team. Replace placeholder URLs in <code>index.html</code> (search for <code>yourcompany.com</code>) with your organization’s endpoints.</p>
+                <div class="dash-grid" role="list">
+                    <a class="dash-tile" role="listitem" href="https://gitlab.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/gitlab/FC6D26" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">GitLab</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://jenkins.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/jenkins/D24939" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Jenkins</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://aws.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.jsdelivr.net/npm/simple-icons@9.20.0/icons/amazonaws.svg" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">AWS</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://gmail.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/gmail/EA4335" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Gmail</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://outlook.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/microsoftoutlook/0078D4" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Outlook</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://calendar.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/googlecalendar/4285F4" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Google Calendar</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://jira.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/jira/0052CC" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Jira</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://mattermost.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/mattermost/0058CC" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Mattermost</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://bitwarden.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/bitwarden/175DDC" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Bitwarden</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://grafana.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/grafana/F46800" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Grafana</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://kibana.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/kibana/005571" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">Kibana</span>
+                    </a>
+                    <a class="dash-tile" role="listitem" href="https://opensearch.yourcompany.com" target="_blank" rel="noopener noreferrer">
+                        <span class="dash-tile-icon-wrap"><img class="dash-tile-icon" src="https://cdn.simpleicons.org/opensearch/005EB8" width="36" height="36" alt="" loading="lazy"></span>
+                        <span class="dash-tile-name">OpenSearch</span>
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <div id="linux-commands" class="page">
+            <div class="card">
+                <div class="card-header">🐧 LINUX COMMANDS</div>
+                <p class="snip-intro">Categorized one-liners for daily ops. Click <strong>Copy</strong> to send the command to your clipboard (browser must allow clipboard access). Adjust paths, users, and hosts before running on production systems.</p>
+                <div id="linux-snippets-mount" aria-live="polite"></div>
+            </div>
+        </div>
+
+        <div id="library" class="page">
+            <div class="lib-shell">
+                <header class="lib-header-sticky">
+                    <div class="lib-header-row">
+                        <div>
+                            <h2 class="lib-h2">📚 Library</h2>
+                            <p class="lib-tagline">IT guides A–Z — each card opens official documentation in a new tab.</p>
+                        </div>
+                        <input type="search" id="lib-search" class="lib-search" placeholder="Search guides by title…" autocomplete="off" aria-label="Search guides by title" oninput="libraryFilter(this.value)">
+                    </div>
+                </header>
+                <div id="library-grid" class="lib-grid" role="list"></div>
+                <p id="lib-empty" class="lib-empty" role="status">No guides match your search.</p>
+            </div>
+        </div>
+
+        <div id="noc-tools" class="page">
+            <div class="card">
+                <div class="card-header">📋 Canned Responses</div>
+                <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:12px;">Quick reply templates — copy to Slack/email.</p>
+                <div id="canned-responses-mount"></div>
+            </div>
+            <div class="card">
+                <div class="card-header">📝 Log Formatter</div>
+                <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:10px;">Per-line: times (purple), user/login (teal), <span class="log-sev-crit" style="font-size:0.65rem;">critical</span> keywords in red. Strips ANSI.</p>
+                <textarea id="log-raw-input" placeholder="Paste log output here..." style="min-height:140px; font-family:'JetBrains Mono',monospace; font-size:0.75rem; margin-bottom:10px;"></textarea>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:0;">
+                    <button type="button" class="btn" onclick="formatLogOutput()">Format &amp; highlight</button>
+                    <button type="button" class="btn" style="background:var(--surface); color:var(--text-main); border:1px solid var(--border);" onclick="clearLogFormatter()">Clear</button>
+                    <button type="button" class="btn btn-save" onclick="copyLastFormattedLog()">Copy plain text</button>
+                </div>
+                <div id="log-formatted-output" class="log-formatted-pre" style="display:none;"></div>
+            </div>
+            <div class="card">
+                <div class="card-header">⚖️ Diff Checker</div>
+                <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:10px;">Line-by-line diff for logs or pretty-printed JSON. Green = added, red = removed.</p>
+                <div class="diff-grid">
+                    <div>
+                        <label for="diff-left">Left (original)</label>
+                        <textarea id="diff-left" placeholder="Original text..."></textarea>
+                    </div>
+                    <div>
+                        <label for="diff-right">Right (changed)</label>
+                        <textarea id="diff-right" placeholder="Updated text..."></textarea>
+                    </div>
+                </div>
+                <div class="sample-row">
+                    <span>Samples:</span>
+                    <button type="button" class="btn-icon" onclick="loadDiffSample('a')">Load A → left</button>
+                    <button type="button" class="btn-icon" onclick="loadDiffSample('b')">Load B → right</button>
+                    <button type="button" class="btn-icon" onclick="loadDiffSample('pair')">Load both (demo diff)</button>
+                    <button type="button" class="btn-icon" onclick="prettifyDiffJson()">Prettify both as JSON</button>
+                </div>
+                <button type="button" class="btn" onclick="runDiffChecker()">Compare</button>
+                <div class="diff-legend">
+                    <span><i style="background:rgba(239,68,68,0.35);"></i> Removed</span>
+                    <span><i style="background:rgba(16,185,129,0.35);"></i> Added</span>
+                    <span><i style="background:var(--border);"></i> Unchanged</span>
+                </div>
+                <div id="diff-output" class="diff-output" style="display:none;"></div>
+            </div>
+        </div>
+
+        <div id="qa-lab" class="page">
+            <div class="card">
+                <div class="card-header">🐛 Bug Report Generator</div>
+                <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:14px;">Structured fields → Markdown / Jira-ready text. Edit the output before pasting if needed.</p>
+                <input type="text" id="bug-summary" placeholder="Short summary / title (optional)" style="margin-bottom:12px;">
+                <textarea id="bug-environment" placeholder="Environment (app version, OS, build, account type…)" style="min-height:64px; font-family:inherit;"></textarea>
+                <div class="qa-bug-grid" style="margin-top:12px;">
+                    <div>
+                        <label for="bug-steps">Steps to reproduce</label>
+                        <textarea id="bug-steps" placeholder="1. …&#10;2. …"></textarea>
+                    </div>
+                    <div>
+                        <label for="bug-expected">Expected result</label>
+                        <textarea id="bug-expected" placeholder="What should happen"></textarea>
+                    </div>
+                    <div>
+                        <label for="bug-actual">Actual result</label>
+                        <textarea id="bug-actual" placeholder="What happens instead"></textarea>
+                    </div>
+                    <div>
+                        <label for="bug-logs">Logs / evidence</label>
+                        <textarea id="bug-logs" placeholder="Stack traces, request IDs, screenshots note…"></textarea>
+                    </div>
+                </div>
+                <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:12px;">
+                    <button type="button" class="btn" onclick="generateBugReportMarkdown()">Generate</button>
+                    <button type="button" class="btn btn-save" onclick="copyBugReportOutput()">Copy to clipboard</button>
+                </div>
+                <label for="bug-md-output" style="display:block; margin-top:14px; font-size:0.7rem; font-weight:700; color:var(--text-dim); text-transform:uppercase;">Output (Markdown)</label>
+                <textarea id="bug-md-output" class="qa-md-out" placeholder="Click Generate…"></textarea>
+            </div>
+
+            <div class="card">
+                <div class="card-header">🎲 Advanced Random Data</div>
+                <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:10px;">Faker bundle: person, IL + intl addresses, phone numbers, Android-style device + IMEI-like / android_id.</p>
+                <button type="button" class="btn" onclick="fetchAdvancedRandomData()">Generate bundle</button>
+                <div id="qa-advanced-output" style="margin-top:8px;"></div>
+            </div>
+
+            <div class="card">
+                <div class="card-header">📱 Device Info Lookup</div>
+                <p style="font-size:0.75rem; color:var(--text-dim); margin-bottom:10px;">Search by device name, codename, or model (e.g. <i>Pixel 7</i>, <i>S23</i>, <i>SM-S911B</i>). Uses server-side catalog.</p>
+                <div style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-start;">
+                    <input type="text" id="device-search-q" placeholder="Samsung S23, Pixel 8, SM-A546B…" style="flex:1; min-width:200px; margin-bottom:0;">
+                    <button type="button" class="btn" onclick="lookupDeviceInfo()">Lookup</button>
+                </div>
+                <div id="qa-device-results" style="margin-top:14px;"></div>
+            </div>
+        </div>
+
+        <div id="it-quick-tools" class="page">
+            <div class="card qtt-wrap">
+                <div class="card-header"><span>⚡ IT QUICK TOOLS</span></div>
+                <p class="qtt-hint" style="margin-top:0;">Client-side utilities (Web Crypto where needed). Nothing is sent to a server. Use the search box to filter the grid.</p>
+                <input type="search" class="qtt-search" id="qtt-search" placeholder="Search tools (e.g. base64, hash, token…)" autocomplete="off" oninput="qttFilterTools(this.value)">
+
+                <div id="qtt-catalog">
+                    <div class="qtt-section" data-qtt-cat="crypto">
+                        <div class="qtt-cat">Cryptography &amp; Security</div>
+                        <div class="qtt-grid">
+                            <button type="button" class="qtt-card" data-qtt-search="token random hex uuid secret api key generator" onclick="qttOpenTool('token')">
+                                <span class="qtt-ic">🔑</span><div><div class="qtt-name">Token generator</div><div class="qtt-desc">Random hex or Base64URL — API keys, secrets, nonces</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="hash sha md5 digest fingerprint" onclick="qttOpenTool('hash')">
+                                <span class="qtt-ic">#️⃣</span><div><div class="qtt-name">Hash text</div><div class="qtt-desc">SHA-256 / SHA-384 / SHA-512 / SHA-1 (browser)</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="encrypt decrypt aes password cipher" onclick="qttOpenTool('crypto')">
+                                <span class="qtt-ic">🔐</span><div><div class="qtt-name">Encrypt / decrypt text</div><div class="qtt-desc">AES-GCM + PBKDF2 (password). Output is a single portable blob</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="password strength meter zxcvbn" onclick="qttOpenTool('password')">
+                                <span class="qtt-ic">🛡️</span><div><div class="qtt-name">Password strength analyser</div><div class="qtt-desc">Length, character classes, common-pattern hints</div></div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="qtt-section" data-qtt-cat="convert">
+                        <div class="qtt-cat">Converters &amp; Formatting</div>
+                        <div class="qtt-grid">
+                            <button type="button" class="qtt-card" data-qtt-search="date time unix epoch iso utc timezone converter" onclick="qttOpenTool('datetime')">
+                                <span class="qtt-ic">🕐</span><div><div class="qtt-name">Date-time converter</div><div class="qtt-desc">ISO, Unix (s/ms), UTC / local display</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="base64 encode decode string utf8" onclick="qttOpenTool('b64str')">
+                                <span class="qtt-ic">📄</span><div><div class="qtt-name">Base64 string encoder/decoder</div><div class="qtt-desc">UTF-8 safe text ↔ Base64</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="base64 file binary upload download" onclick="qttOpenTool('b64file')">
+                                <span class="qtt-ic">📎</span><div><div class="qtt-name">Base64 file converter</div><div class="qtt-desc">File → Base64 or Base64 → download file</div></div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="qtt-section" data-qtt-cat="text">
+                        <div class="qtt-cat">Text &amp; encoding</div>
+                        <div class="qtt-grid">
+                            <button type="button" class="qtt-card" data-qtt-search="nato alphabet phonetic spelling radio military" onclick="qttOpenTool('nato')">
+                                <span class="qtt-ic">📝</span><div><div class="qtt-name">Text to NATO alphabet</div><div class="qtt-desc">Letters and digits → Alfa, Bravo, Charlie…</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="ascii binary bits utf8" onclick="qttOpenTool('asciibin')">
+                                <span class="qtt-ic">💾</span><div><div class="qtt-name">Text to ASCII binary</div><div class="qtt-desc">UTF-8 bytes as 0/1 groups</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="unicode codepoint u+ escape" onclick="qttOpenTool('unicode')">
+                                <span class="qtt-ic">🔣</span><div><div class="qtt-name">Text to Unicode</div><div class="qtt-desc">Per-character code points and escapes</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="list newline comma space separator split join" onclick="qttOpenTool('listconv')">
+                                <span class="qtt-ic">📋</span><div><div class="qtt-name">List converter</div><div class="qtt-desc">Lines ↔ comma / space / pipe delimited</div></div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="qtt-section" data-qtt-cat="data">
+                        <div class="qtt-cat">Structured data &amp; markup</div>
+                        <div class="qtt-grid">
+                            <button type="button" class="qtt-card" data-qtt-search="yaml json convert" onclick="qttOpenTool('yamljson')">
+                                <span class="qtt-ic">🔄</span><div><div class="qtt-name">YAML → JSON</div><div class="qtt-desc">Parse YAML, pretty JSON</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="yaml toml convert" onclick="qttOpenTool('yamltoml')">
+                                <span class="qtt-ic">🔄</span><div><div class="qtt-name">YAML → TOML</div><div class="qtt-desc">Needs smol-toml on first use</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="json yaml convert" onclick="qttOpenTool('jsonyaml')">
+                                <span class="qtt-ic">🔄</span><div><div class="qtt-name">JSON → YAML</div><div class="qtt-desc">Object tree to YAML dump</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="json toml convert" onclick="qttOpenTool('jsontoml')">
+                                <span class="qtt-ic">🔄</span><div><div class="qtt-name">JSON → TOML</div><div class="qtt-desc">TOML stringify from JSON</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="toml json convert" onclick="qttOpenTool('tomljson')">
+                                <span class="qtt-ic">🔄</span><div><div class="qtt-name">TOML → JSON</div><div class="qtt-desc">Parse TOML to indented JSON</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="toml yaml convert" onclick="qttOpenTool('tomlyaml')">
+                                <span class="qtt-ic">🔄</span><div><div class="qtt-name">TOML → YAML</div><div class="qtt-desc">Round-trip via object</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="xml json convert" onclick="qttOpenTool('xmljson')">
+                                <span class="qtt-ic">🔄</span><div><div class="qtt-name">XML → JSON</div><div class="qtt-desc">Simple tree (no attributes)</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="json xml convert" onclick="qttOpenTool('jsonxml')">
+                                <span class="qtt-ic">🔄</span><div><div class="qtt-name">JSON → XML</div><div class="qtt-desc">Nested object to elements</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="markdown html md" onclick="qttOpenTool('mdhtml')">
+                                <span class="qtt-ic">📰</span><div><div class="qtt-name">Markdown → HTML</div><div class="qtt-desc">Uses marked (preview)</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="json prettify format indent" onclick="qttOpenTool('jsonpretty')">
+                                <span class="qtt-ic">✨</span><div><div class="qtt-name">JSON prettify</div><div class="qtt-desc">Parse and re-stringify with indent</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="json minify compact one line" onclick="qttOpenTool('jsonmini')">
+                                <span class="qtt-ic">🗜️</span><div><div class="qtt-name">JSON minify</div><div class="qtt-desc">Single-line JSON</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="json csv table export" onclick="qttOpenTool('jsoncsv')">
+                                <span class="qtt-ic">📊</span><div><div class="qtt-name">JSON → CSV</div><div class="qtt-desc">Array of objects → header + rows</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="sql format prettify dialect mysql postgres" onclick="qttOpenTool('sqlpretty')">
+                                <span class="qtt-ic">🗃️</span><div><div class="qtt-name">SQL prettify</div><div class="qtt-desc">sql-formatter with dialect</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="yaml format prettify indent" onclick="qttOpenTool('yamlpretty')">
+                                <span class="qtt-ic">✨</span><div><div class="qtt-name">YAML prettify</div><div class="qtt-desc">Parse + consistent dump</div></div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="qtt-section" data-qtt-cat="gen">
+                        <div class="qtt-cat">Generators &amp; parsers</div>
+                        <div class="qtt-grid">
+                            <button type="button" class="qtt-card" data-qtt-search="user agent browser ua parse" onclick="qttOpenTool('uaparse')">
+                                <span class="qtt-ic">🕵️</span><div><div class="qtt-name">User-agent parser</div><div class="qtt-desc">Browser / OS / device hints</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="random port ephemeral tcp udp" onclick="qttOpenTool('randport')">
+                                <span class="qtt-ic">🔌</span><div><div class="qtt-name">Random port</div><div class="qtt-desc">Ephemeral range (49152–65535)</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="mac address random generate local" onclick="qttOpenTool('macgen')">
+                                <span class="qtt-ic">🎲</span><div><div class="qtt-name">MAC address generator</div><div class="qtt-desc">Locally administered unicast</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="ipv6 ula private fd00 rfc4193" onclick="qttOpenTool('ipv6ula')">
+                                <span class="qtt-ic">🌐</span><div><div class="qtt-name">IPv6 ULA generator</div><div class="qtt-desc">Random /64 under fd00::/8</div></div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="qtt-section" data-qtt-cat="net">
+                        <div class="qtt-cat">Network &amp; system</div>
+                        <div class="qtt-grid">
+                            <button type="button" class="qtt-card" data-qtt-search="ipv4 subnet cidr mask network broadcast" onclick="qttOpenTool('subnet')">
+                                <span class="qtt-ic">🌐</span><div><div class="qtt-name">IPv4 subnet calculator</div><div class="qtt-desc">CIDR → network, range, broadcast</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="ipv4 integer long dotted decimal" onclick="qttOpenTool('ipv4conv')">
+                                <span class="qtt-ic">🔢</span><div><div class="qtt-name">IPv4 address converter</div><div class="qtt-desc">Dotted ↔ 32-bit decimal</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="ipv4 range expand cidr list" onclick="qttOpenTool('iprange')">
+                                <span class="qtt-ic">📏</span><div><div class="qtt-name">IPv4 range expander</div><div class="qtt-desc">Small CIDRs to address list</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="mac address oui vendor lookup" onclick="qttOpenTool('maclookup')">
+                                <span class="qtt-ic">🔍</span><div><div class="qtt-name">MAC address lookup</div><div class="qtt-desc">Offline OUI hints</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="chmod octal permission unix rwx" onclick="qttOpenTool('chmod')">
+                                <span class="qtt-ic">🔢</span><div><div class="qtt-name">Chmod calculator</div><div class="qtt-desc">Octal → symbolic rwx</div></div>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="qtt-section" data-qtt-cat="calc">
+                        <div class="qtt-cat">Calculators</div>
+                        <div class="qtt-grid">
+                            <button type="button" class="qtt-card" data-qtt-search="eta throughput time remaining estimate" onclick="qttOpenTool('eta')">
+                                <span class="qtt-ic">⏱️</span><div><div class="qtt-name">ETA calculator</div><div class="qtt-desc">Items left ÷ rate → finish time</div></div>
+                            </button>
+                            <button type="button" class="qtt-card" data-qtt-search="percentage percent ratio math" onclick="qttOpenTool('percent')">
+                                <span class="qtt-ic">％</span><div><div class="qtt-name">Percentage calculator</div><div class="qtt-desc">X% of Y, or X is what % of Y</div></div>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div id="qtt-panel" class="card qtt-panel">
+                <div class="card-header">
+                    <span class="qtt-panel-h" id="qtt-panel-title">Tool</span>
+                    <button type="button" class="btn" style="background:var(--surface);color:var(--text-main);border:1px solid var(--border);" onclick="qttCloseTool()">← Back to menu</button>
+                </div>
+                <div id="qtt-panel-body"></div>
+            </div>
+        </div>
+
+    </div>
+    <div id="noc-toast" class="noc-toast" role="status" aria-live="polite"></div>
+
+    <div id="scratchpad-root" class="scratchpad" role="dialog" aria-label="Local scratchpad">
+        <div class="scratchpad-head">
+            <span class="scratchpad-title">📝 Local Scratchpad</span>
+            <div class="scratchpad-actions">
+                <button type="button" class="scratchpad-btn" id="scratchpad-expand-btn" onclick="scratchpadToggleExpand()" title="Expand / shrink" aria-expanded="false">⤢</button>
+                <button type="button" class="scratchpad-btn" onclick="scratchpadMinimize()" title="Minimize to button">—</button>
+            </div>
+        </div>
+        <p class="scratchpad-hint">Saved only in this browser (localStorage).</p>
+        <textarea id="scratchpad-ta" rows="5" spellcheck="true" placeholder="Quick notes, ticket IDs, paste buffer…"></textarea>
+    </div>
+    <button type="button" id="scratchpad-fab" class="scratchpad-fab" onclick="scratchpadRestore()" title="Open scratchpad" aria-label="Open local scratchpad">📝</button>
+</body>
+</html>
