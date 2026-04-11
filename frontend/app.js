@@ -67,6 +67,8 @@ document.addEventListener('DOMContentLoaded', () => {
     scratchpadInit();
     renderLinuxSnippets();
     renderLibrary();
+    refreshDashBookmarkCount();
+    updateKpiStrip();
 });
 
 // Sidebar Navigation
@@ -78,6 +80,15 @@ function showPage(pageId, navElement) {
     document.querySelectorAll('.nav-item').forEach(i => i.classList.remove('active'));
     document.getElementById(pageId).classList.add('active');
     if(navElement) navElement.classList.add('active');
+    if (pageId === 'dashboard') {
+        refreshDashBookmarkCount();
+    }
+}
+
+function refreshDashBookmarkCount() {
+    const el = document.getElementById('dash-bookmark-count');
+    if (!el) return;
+    el.textContent = String(document.querySelectorAll('#dashboard a.dash-tile').length);
 }
 
 // Roster Management
@@ -188,6 +199,40 @@ function updateAllViews() {
     renderTopBanner();
     renderClosedLogs();
     updateChartData();
+    updateKpiStrip();
+}
+
+function updateKpiStrip() {
+    const activeEl = document.getElementById('kpi-active');
+    const closedEl = document.getElementById('kpi-closed');
+    const critEl = document.getElementById('kpi-critical');
+    const postureEl = document.getElementById('kpi-posture');
+    const postureHint = document.getElementById('kpi-posture-hint');
+    if (activeEl) activeEl.textContent = String(activeIncidents.length);
+    if (closedEl) closedEl.textContent = String(closedIncidents.length);
+    const criticalCount = activeIncidents.filter((i) => i.sev >= 4).length;
+    if (critEl) critEl.textContent = String(criticalCount);
+    if (postureEl && postureHint) {
+        postureEl.style.fontSize = '1.05rem';
+        postureEl.style.color = '';
+        if (activeIncidents.some((i) => i.sev === 5)) {
+            postureEl.textContent = 'STORM';
+            postureHint.textContent = 'Sev 5 active';
+            postureEl.style.color = 'var(--red)';
+        } else if (criticalCount > 0) {
+            postureEl.textContent = 'Alert';
+            postureHint.textContent = 'Critical queue';
+            postureEl.style.color = 'var(--orange)';
+        } else if (activeIncidents.length > 0) {
+            postureEl.textContent = 'Busy';
+            postureHint.textContent = 'Incidents in flight';
+            postureEl.style.color = 'var(--yellow)';
+        } else {
+            postureEl.textContent = 'Nominal';
+            postureHint.textContent = 'All clear';
+            postureEl.style.color = 'var(--green)';
+        }
+    }
 }
 
 function getSevColor(sev) {
@@ -202,7 +247,7 @@ function renderActiveIncidents() {
     }
 
     list.innerHTML = activeIncidents.map(i => `
-        <div style="background:rgba(255,255,255,0.05); padding:10px; border-radius:6px; margin-bottom:5px; border-left:4px solid ${getSevColor(i.sev)}">
+        <div class="incident-tile" style="border-left:4px solid ${getSevColor(i.sev)}">
             <div style="display:flex; justify-content:space-between; align-items:center;">
                 <div style="font-size:0.75rem;"><b>#INC-${i.id}</b> | ${i.client} (Sev ${i.sev})</div>
                 <div style="display:flex; gap:5px;">
@@ -256,17 +301,30 @@ function initChart() {
         type: 'bar',
         data: {
             labels: ['Sev 1', 'Sev 2', 'Sev 3', 'Sev 4', 'Sev 5'],
-            datasets: [{ 
-                label: 'Resolved Incidents', 
-                data: [0, 0, 0, 0, 0], 
-                backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'] 
+            datasets: [{
+                label: 'Resolved Incidents',
+                data: [0, 0, 0, 0, 0],
+                backgroundColor: ['#10b981', '#3b82f6', '#f59e0b', '#f97316', '#ef4444'],
+                borderRadius: 8,
+                borderSkipped: false,
+                maxBarThickness: 36,
             }]
         },
-        options: { 
-            maintainAspectRatio: false, 
+        options: {
+            maintainAspectRatio: false,
             plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { stepSize: 1, color: '#94a3b8' } }, x: { ticks: { color: '#94a3b8' } } }
-        }
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { stepSize: 1, color: '#94a3b8', font: { family: "'JetBrains Mono', monospace", size: 11 } },
+                    grid: { color: 'rgba(148, 163, 184, 0.1)', drawBorder: false },
+                },
+                x: {
+                    ticks: { color: '#94a3b8', font: { family: "'Inter', sans-serif", size: 11 } },
+                    grid: { display: false, drawBorder: false },
+                },
+            },
+        },
     });
 }
 
