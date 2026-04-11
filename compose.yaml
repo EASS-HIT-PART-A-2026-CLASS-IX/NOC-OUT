@@ -1,7 +1,6 @@
 services:
   db:
     image: postgres:15
-    container_name: soc_db
     restart: always
     environment:
       POSTGRES_USER: itay_admin
@@ -14,7 +13,6 @@ services:
 
   backend:
     build: ./backend
-    container_name: soc_backend
     restart: always
     ports:
       - "8000:8000"
@@ -29,7 +27,6 @@ services:
 
   frontend:
     build: ./frontend
-    container_name: soc_frontend
     restart: always
     ports:
       - "80:80"
