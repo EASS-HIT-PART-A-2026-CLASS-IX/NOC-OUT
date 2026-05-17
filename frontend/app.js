@@ -1588,7 +1588,7 @@ async function simStart() {
         _simAppendMsg('ai', data.scenario_message);
         document.getElementById('sim-input-area').style.display = 'block';
         document.getElementById('sim-user-input').focus();
-        status.textContent = 'Drill active — describe your mitigation plan below.';
+        status.textContent = 'Quiz active — choose A, B, C, or D.';
     } catch (e) {
         document.getElementById('sim-chat').innerHTML = '';
         const friendly = _simFriendlyError(e);
@@ -1598,6 +1598,12 @@ async function simStart() {
         btn.disabled = false;
         btn.textContent = '▶ Start New Drill';
     }
+}
+
+function simQuickPick(letter) {
+    if (!_simSessionId) { showNocToast('Start a quiz first.'); return; }
+    document.getElementById('sim-user-input').value = letter;
+    simRespond();
 }
 
 async function simRespond() {
@@ -1613,7 +1619,7 @@ async function simRespond() {
 
     _simAppendMsg('user', msg);
     input.value = '';
-    _simAppendMsg('ai', 'Evaluating your response…', true);
+    _simAppendMsg('ai', 'Evaluating your answer…', true);
 
     try {
         const data = await postApiJson('simulator/respond', { session_id: _simSessionId, message: msg });

@@ -1046,6 +1046,8 @@
         .sim-msg-user { align-self: flex-end;   background: rgba(77,141,238,0.14); border: 1px solid rgba(77,141,238,0.22); }
         .sim-msg-label { font-size: 0.62rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: var(--text-dim); margin-bottom: 5px; display: block; }
         .sim-thinking  { align-self: flex-start; color: var(--text-dim); font-size: 0.78rem; font-style: italic; padding: 8px 4px; }
+        .sim-option-btns { display: flex; gap: 8px; margin-bottom: 10px; flex-wrap: wrap; }
+        .sim-option-btn  { min-width: 44px; font-weight: 700; font-size: 0.9rem; padding: 7px 14px; }
     </style>
 </head>
 <body data-theme="dark">
@@ -1585,7 +1587,7 @@
         <div id="page-simulator" class="page">
             <header class="page-hero">
                 <h1>NOC AI Simulator</h1>
-                <p>Live incident response drills with a Senior NOC Manager AI. Describe your mitigation plan and receive a professional score and feedback.</p>
+                <p>MCQ-style incident response drills powered by AI. Read the scenario, pick the best action (A–D), and get a detailed explanation of every option.</p>
             </header>
 
             <div class="card">
@@ -1598,17 +1600,22 @@
 
             <div class="card" id="sim-chat-card" style="display:none;">
                 <div class="card-header">
-                    💬 Incident Response Drill
-                    <button class="btn" style="background:var(--surface); color:var(--text-dim); border:1px solid var(--border); font-size:0.72rem; padding:5px 12px;" onclick="simReset()">↺ New Drill</button>
+                    💬 NOC/SOC MCQ Quiz
+                    <button class="btn" style="background:var(--surface); color:var(--text-dim); border:1px solid var(--border); font-size:0.72rem; padding:5px 12px;" onclick="simReset()">↺ New Question</button>
                 </div>
                 <div id="sim-chat" class="sim-chat"></div>
                 <div id="sim-input-area" style="margin-top:16px; display:none;">
-                    <textarea id="sim-user-input" placeholder="Describe your mitigation steps in detail…"
-                              style="min-height:100px; resize:vertical; font-family:inherit; margin-bottom:8px;"
-                              onkeydown="if(event.ctrlKey && event.key==='Enter') simRespond()"></textarea>
-                    <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
-                        <button class="btn" id="sim-submit-btn" onclick="simRespond()">Submit Response</button>
-                        <span style="font-size:0.7rem; color:var(--text-dim);">Ctrl + Enter to submit</span>
+                    <div class="sim-option-btns">
+                        <button class="btn sim-option-btn" onclick="simQuickPick('A')">A</button>
+                        <button class="btn sim-option-btn" onclick="simQuickPick('B')">B</button>
+                        <button class="btn sim-option-btn" onclick="simQuickPick('C')">C</button>
+                        <button class="btn sim-option-btn" onclick="simQuickPick('D')">D</button>
+                    </div>
+                    <div style="display:flex; gap:8px; align-items:center;">
+                        <input id="sim-user-input" type="text" placeholder="Pick A–D above, type 'next', or ask a follow-up…"
+                               style="font-family:inherit; flex:1;"
+                               onkeydown="if(event.key==='Enter') simRespond()">
+                        <button class="btn" id="sim-submit-btn" onclick="simRespond()">Submit</button>
                     </div>
                 </div>
             </div>
