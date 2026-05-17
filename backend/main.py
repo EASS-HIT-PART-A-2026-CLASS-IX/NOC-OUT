@@ -5,6 +5,8 @@ from faker import Faker
 import os, random, time
 
 from device_catalog import lookup_devices, random_device_entry
+from api.ip_reputation import router as ip_reputation_router
+from api.simulator import router as simulator_router
 
 # --- Database (Postgres — startup waits for Docker compose) ---
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://itay_admin:password123@db:5432/soc_data")
@@ -34,6 +36,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+app.include_router(ip_reputation_router)
+app.include_router(simulator_router)
 
 
 @app.on_event("startup")

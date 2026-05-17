@@ -52,6 +52,30 @@ async function fetchApiJson(pathWithQuery) {
     throw lastErr;
 }
 
+async function postApiJson(pathWithQuery, body = {}) {
+    const urls = buildApiUrls(pathWithQuery);
+    let lastErr = new Error('API unreachable');
+    for (const url of urls) {
+        try {
+            const r = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(body),
+            });
+            if (!r.ok) {
+                const t = await r.text();
+                lastErr = new Error(`HTTP ${r.status}: ${t.slice(0, 200)}`);
+                continue;
+            }
+            return await r.json();
+        } catch (e) {
+            lastErr = e instanceof Error ? e : new Error(String(e));
+        }
+    }
+    lastErr.attemptedUrls = urls;
+    throw lastErr;
+}
+
 // State Management
 let ticketCounter = 1000;
 let activeIncidents = [];
@@ -64,6 +88,7 @@ document.addEventListener('DOMContentLoaded', () => {
     populateClients();
     loadRoster();
     renderCannedResponses();
+    renderIpHistory();
     scratchpadInit();
     renderLinuxSnippets();
     renderLibrary();
@@ -1466,4 +1491,184 @@ async function exportToExcel() {
     a.href = url;
     a.download = `SOC_Shift_Report_${new Date().toLocaleDateString('en-GB').replace(/\//g, '-')}.xlsx`;
     a.click();
+}
+
+// ─── IP Reputation Scanner ────────────────────────────────────────────────────
+
+async function scanIp() {
+    const ip = document.getElementById('ip-input').value.trim();
+    if (!ip) { showNocToast('Please enter an IP address.'); return; }
+
+    const btn = document.getElementById('ip-scan-btn');
+    btn.disabled = true;
+    btn.textContent = 'Scanning…';
+
+    try {
+        const data = await fetchApiJson(`ip/scan?ip=${encodeURIComponent(ip)}`);
+        renderIpResult(data);
+    } catch (e) {
+        showNocToast(`Scan failed: ${e.message}`);
+    } finally {
+        btn.disabled = false;
+        btn.textContent = 'Scan';
+    }
+}
+
+function renderIpResult(data) {
+    const score = data.abuse_confidence_score ?? 0;
+
+    const badge = document.getElementById('ip-score-badge');
+    badge.textContent = score;
+    badge.className = 'ip-score-badge ' + (
+        score < 25 ? 'ip-score-green'  :
+        score < 50 ? 'ip-score-yellow' :
+        score < 75 ? 'ip-score-orange' : 'ip-score-red'
+    );
+
+    document.getElementById('ip-score-label').textContent =
+        score < 25 ? 'Clean' : score < 50 ? 'Low Risk' : score < 75 ? 'Medium Risk' : 'High Risk';
+    document.getElementById('ip-result-addr').textContent = data.ip;
+    document.getElementById('ip-isp').textContent      = data.isp         || '—';
+    document.getElementById('ip-domain').textContent   = data.domain      || '—';
+    document.getElementById('ip-country').textContent  = data.country_code || '—';
+    document.getElementById('ip-usage').textContent    = data.usage_type  || '—';
+    document.getElementById('ip-reports').textContent  = data.total_reports ?? '0';
+    document.getElementById('ip-last').textContent     = data.last_reported_at
+        ? new Date(data.last_reported_at).toLocaleDateString()
+        : 'Never';
+    document.getElementById('ip-whitelist').textContent = data.is_whitelisted ? 'Yes ✓' : 'No';
+
+    document.getElementById('ip-result-card').style.display = 'block';
+
+    const history = JSON.parse(localStorage.getItem('ip-scan-history') || '[]');
+    history.unshift({ ip: data.ip, score, ts: Date.now() });
+    localStorage.setItem('ip-scan-history', JSON.stringify(history.slice(0, 10)));
+    renderIpHistory();
+}
+
+function renderIpHistory() {
+    const history = JSON.parse(localStorage.getItem('ip-scan-history') || '[]');
+    const list = document.getElementById('ip-history-list');
+    if (!list || !history.length) return;
+
+    list.innerHTML = history.map(e => {
+        const color = e.score < 25 ? 'var(--green)' : e.score < 50 ? 'var(--yellow)' : e.score < 75 ? 'var(--orange)' : 'var(--red)';
+        return `<div class="ip-history-row" onclick="document.getElementById('ip-input').value='${e.ip}'; scanIp();">
+            <span style="font-family:'JetBrains Mono'; font-size:0.82rem; color:var(--accent); min-width:140px;">${e.ip}</span>
+            <span style="font-weight:700; color:${color};">${e.score}/100</span>
+            <span style="font-size:0.72rem; color:var(--text-dim); margin-left:auto;">${new Date(e.ts).toLocaleString()}</span>
+        </div>`;
+    }).join('');
+    document.getElementById('ip-history-card').style.display = 'block';
+}
+
+// ─── NOC AI Simulator ─────────────────────────────────────────────────────────
+
+let _simSessionId = null;
+
+async function simStart() {
+    const btn    = document.getElementById('sim-start-btn');
+    const status = document.getElementById('sim-status');
+
+    btn.disabled = true;
+    btn.textContent = '…Loading';
+    status.textContent = 'Connecting to Senior NOC Manager AI…';
+
+    document.getElementById('sim-chat').innerHTML = '';
+    document.getElementById('sim-chat-card').style.display = 'block';
+    document.getElementById('sim-input-area').style.display = 'none';
+    _simSessionId = null;
+
+    _simAppendMsg('ai', 'Generating scenario…', true);
+
+    try {
+        const data = await postApiJson('simulator/start');
+        _simSessionId = data.session_id;
+        document.getElementById('sim-chat').innerHTML = '';
+        _simAppendMsg('ai', data.scenario_message);
+        document.getElementById('sim-input-area').style.display = 'block';
+        document.getElementById('sim-user-input').focus();
+        status.textContent = 'Drill active — describe your mitigation plan below.';
+    } catch (e) {
+        document.getElementById('sim-chat').innerHTML = '';
+        const friendly = _simFriendlyError(e);
+        _simAppendMsg('ai', friendly);
+        status.textContent = '';
+    } finally {
+        btn.disabled = false;
+        btn.textContent = '▶ Start New Drill';
+    }
+}
+
+async function simRespond() {
+    if (!_simSessionId) { showNocToast('Start a drill first.'); return; }
+
+    const input = document.getElementById('sim-user-input');
+    const msg   = input.value.trim();
+    if (!msg) { showNocToast('Please type your response.'); return; }
+
+    const submitBtn = document.getElementById('sim-submit-btn');
+    submitBtn.disabled = true;
+    input.disabled = true;
+
+    _simAppendMsg('user', msg);
+    input.value = '';
+    _simAppendMsg('ai', 'Evaluating your response…', true);
+
+    try {
+        const data = await postApiJson('simulator/respond', { session_id: _simSessionId, message: msg });
+        _simRemoveThinking();
+        _simAppendMsg('ai', data.reply);
+    } catch (e) {
+        _simRemoveThinking();
+        _simAppendMsg('ai', _simFriendlyError(e));
+    } finally {
+        submitBtn.disabled = false;
+        input.disabled = false;
+        input.focus();
+    }
+}
+
+function simReset() {
+    _simSessionId = null;
+    document.getElementById('sim-chat').innerHTML = '';
+    document.getElementById('sim-chat-card').style.display = 'none';
+    document.getElementById('sim-input-area').style.display = 'none';
+    document.getElementById('sim-status').textContent = '';
+}
+
+function _simFriendlyError(e) {
+    if (/HTTP 429/.test(e.message)) {
+        return '⚠️ The AI is currently rate-limited or quota has been exceeded. Please wait a minute and try again.';
+    }
+    if (/HTTP 503/.test(e.message)) {
+        return '⚠️ The AI service is temporarily unavailable. Please try again shortly.';
+    }
+    return `⚠️ Could not reach the AI service. ${e.message}`;
+}
+
+function _simAppendMsg(role, text, isThinking = false) {
+    const chat = document.getElementById('sim-chat');
+    const el   = document.createElement('div');
+    if (isThinking) {
+        el.className = 'sim-thinking';
+        el.dataset.thinking = '1';
+        el.textContent = text;
+    } else {
+        el.className = `sim-msg sim-msg-${role}`;
+        const label = document.createElement('span');
+        label.className = 'sim-msg-label';
+        label.textContent = role === 'ai' ? '🎓 NOC Manager' : '👤 You';
+        el.appendChild(label);
+        const body = document.createElement('span');
+        body.textContent = text;
+        el.appendChild(body);
+    }
+    chat.appendChild(el);
+    chat.scrollTop = chat.scrollHeight;
+}
+
+function _simRemoveThinking() {
+    const el = document.querySelector('#sim-chat [data-thinking]');
+    if (el) el.remove();
 }
