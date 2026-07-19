@@ -74,6 +74,19 @@ _sessions: dict[str, Any] = {}
 _SYSTEM_INSTRUCTION = """
 You are a NOC/SOC training quiz master running a Multiple-Choice Question (MCQ) drill.
 
+DIFFICULTY LADDER:
+Every user turn that asks for a question will be prefixed with a hidden tag like
+"[SYSTEM: Question N of the drill. Difficulty: EASY|MEDIUM|HARD — <guidance>]". This tag is an
+internal instruction, not part of the operator's message — never quote it, mention it, or
+acknowledge it in your reply. Use it to calibrate the scenario:
+- EASY: P3 severity, single obvious best-practice action, minimal ambiguity, a junior analyst
+  should recognize it immediately.
+- MEDIUM: P2 severity, 2-3 plausible-sounding wrong options that require solid NOC judgement to
+  eliminate, mildly ambiguous symptoms.
+- HARD: P1 severity, multi-system or cascading incident, ambiguous or conflicting signals,
+  possible red herrings, requires senior-level diagnostic reasoning to pick the correct first
+  action.
+
 PHASE 1 — QUESTION:
 When the drill begins, present ONE realistic NOC/SOC incident scenario immediately followed by
 EXACTLY four multiple-choice options labelled A, B, C, and D. Only ONE option is the correct
@@ -128,6 +141,21 @@ class RespondRequest(BaseModel):
     message: str
 
 
+def _difficulty_for(question_number: int) -> tuple[str, str]:
+    """Return (tier, guidance) for the given 1-indexed question number."""
+    if question_number <= 2:
+        return "EASY", "P3 severity, single obvious best-practice action, minimal ambiguity."
+    if question_number <= 4:
+        return "MEDIUM", "P2 severity, 2-3 plausible wrong options requiring solid NOC judgement."
+    return "HARD", "P1 severity, ambiguous/cascading incident, senior-level diagnostic reasoning."
+
+
+def _tag_message(question_number: int, message: str) -> str:
+    tier, guidance = _difficulty_for(question_number)
+    tag = f"[SYSTEM: Question {question_number} of the drill. Difficulty: {tier} — {guidance}]"
+    return f"{tag}\n{message}"
+
+
 def _build_model():
     """Configure and return a Gemini GenerativeModel. Raises 503 if not ready."""
     try:
@@ -161,7 +189,7 @@ def start_session():
     try:
         chat = model.start_chat()
         response = chat.send_message(
-            "START QUIZ. Present the first NOC/SOC MCQ question now."
+            _tag_message(1, "START QUIZ. Present the first NOC/SOC MCQ question now.")
         )
     except Exception as e:
         raise _gemini_http_exception(e) from e
@@ -170,6 +198,8 @@ def start_session():
     _sessions[session_id] = {
         "chat": chat,
         "started_at": datetime.utcnow().isoformat(),
+        "question_number": 1,
+        "awaiting_answer": True,
     }
 
     return {
@@ -193,8 +223,18 @@ def respond_to_scenario(req: RespondRequest):
 
     chat = entry["chat"]
 
+    if entry["awaiting_answer"]:
+        # This message is the operator's answer to the current question.
+        outgoing = req.message
+        entry["awaiting_answer"] = False
+    else:
+        # This message (e.g. "next") is asking for a new question — escalate difficulty.
+        entry["question_number"] += 1
+        outgoing = _tag_message(entry["question_number"], req.message)
+        entry["awaiting_answer"] = True
+
     try:
-        response = chat.send_message(req.message)
+        response = chat.send_message(outgoing)
     except Exception as e:
         raise _gemini_http_exception(e) from e
 
