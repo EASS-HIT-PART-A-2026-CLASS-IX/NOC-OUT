@@ -386,7 +386,7 @@
         
         /* Critical Banner Animation */
         @keyframes pulseAlert { 0% { box-shadow: 0 0 0 0 rgba(232, 93, 93, 0.35); } 70% { box-shadow: 0 0 0 12px rgba(232, 93, 93, 0); } 100% { box-shadow: 0 0 0 0 rgba(232, 93, 93, 0); } }
-        .critical-banner { background: linear-gradient(135deg, #c94a4a, var(--red)); color: white; padding: 15px 20px; border-radius: var(--radius-md); display: flex; justify-content: space-between; align-items: center; font-weight: 700; margin-bottom: 10px; animation: pulseAlert 2.5s ease-in-out infinite; box-shadow: var(--shadow-float); }
+        .critical-banner { background: linear-gradient(135deg, #c94a4a, var(--red)); color: white; padding: 15px 20px; border-radius: var(--radius-md); display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 4px 16px; font-weight: 700; margin-bottom: 10px; animation: pulseAlert 2.5s ease-in-out infinite; box-shadow: var(--shadow-float); }
         
         table { width: 100%; border-collapse: collapse; font-size: 0.8rem; }
         th { text-align: left; color: var(--text-dim); padding-bottom: 10px; border-bottom: 1px solid var(--border); }

@@ -94,6 +94,7 @@ document.addEventListener('DOMContentLoaded', () => {
     renderLibrary();
     refreshDashBookmarkCount();
     updateKpiStrip();
+    setInterval(renderTopBanner, 30000);
 });
 
 // Sidebar Navigation
@@ -187,9 +188,10 @@ function createIncident() {
         id: ticketCounter, 
         analyst, 
         sev, 
-        client, 
-        desc, 
+        client,
+        desc,
         startTime: new Date().toLocaleTimeString('en-GB'),
+        startTimestamp: Date.now(),
         endTime: null
     };
     
@@ -287,10 +289,18 @@ function renderActiveIncidents() {
     `).join('');
 }
 
+function formatOpenDuration(startTimestamp) {
+    const ms = Date.now() - (startTimestamp || Date.now());
+    const totalMinutes = Math.max(0, Math.floor(ms / 60000));
+    const hours = Math.floor(totalMinutes / 60);
+    const minutes = totalMinutes % 60;
+    return hours > 0 ? `${hours}h ${minutes}m` : `${minutes}m`;
+}
+
 function renderTopBanner() {
     const container = document.getElementById('critical-banner-container');
     const criticals = activeIncidents.filter(i => i.sev >= 4);
-    
+
     if(criticals.length === 0) {
         container.innerHTML = '';
         return;
@@ -298,7 +308,7 @@ function renderTopBanner() {
 
     container.innerHTML = criticals.map(i => `
         <div class="critical-banner">
-            <div>🚨 CRITICAL ALERT (#INC-${i.id}) | ${i.client} | SEV ${i.sev}</div>
+            <div>⚠️ 🚨 DANGER — CRITICAL ALERT (#INC-${i.id}) | ${i.client} | SEV ${i.sev} | Open for ${formatOpenDuration(i.startTimestamp)}</div>
             <div style="font-size:0.8rem; font-weight:400;">Analyst: ${i.analyst} | Desc: ${i.desc.substring(0,50)}...</div>
         </div>
     `).join('');
